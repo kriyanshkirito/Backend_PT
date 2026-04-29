@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Top Anime Catalog - MAL Scraper</title>
+  <style>
+   
+    body { 
+      font-family: system-ui, -apple-system, sans-serif; 
+     
+    }
+    .header { 
+      text-align: center; color: white; margin-bottom: 2rem; 
+    }
+    .header h1 { font-size: clamp(2rem, 5vw, 3rem); margin-bottom: 0.5rem; }
+    .header p { font-size: 1.1rem; opacity: 0.9; }
+    .catalog { 
+      max-width: 1400px; margin: 0 auto; 
+      display: grid; 
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+      gap: 1.5rem; 
+    }
+    .anime-card { 
+      background: rgba(255,255,255,0.95); 
+      border-radius: 1rem; overflow: hidden; 
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2); 
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display:flex;
+      justify-content:left;
+      align-items:flex-start; 
+    }
+    .anime-card:hover { 
+      transform: translateY(-8px) scale(1.02); 
+      box-shadow: 0 16px 48px rgba(0,0,0,0.3); 
+       display:flex;
+      justify-content:center;
+      align-items:center; 
+    }
+    .anime-image { 
+      width: 200px; height: 300px; object-fit: cover; 
+    }
+    .anime-title { 
+      padding: 1.5rem; text-align: center; 
+      font-size: 1.2rem; font-weight: 600; color: #2c3e50; 
+      min-height: 4rem; display: flex; align-items: center; justify-content: center; 
+    }
+    .loading { text-align: center; color: white; font-size: 1.4rem; margin: 4rem 0; }
+    .stats { background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; }
+    @media (max-width: 640px) { .catalog { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1 style="color:Black;font-family:cursive;font-weight:900px">🎌 Top Anime from MAL</h1>
+    <p>Your scraper data | <span id="count">0</span> anime loaded</p>
+  </div>
+  
+  <div class="stats" id="stats" style="display:none;">
+    Fastest load: <span id="fastest">-</span>s | Images: <span id="images">0</span>
+  </div>
+  
+  <div id="loading" class="loading">🔄 Loading your scraped anime...</div>
+  <div id="catalog" style="display:none;"></div>
+
+  <script>
+    const startTime = performance.now();
+    
+    async function loadCatalog() {
+      try {
+        const res = await fetch('anime.json');
+        const data = await res.json();
+        
+        document.getElementById('loading').remove();
+        document.getElementById('catalog').style.display = 'grid';
+        document.getElementById('count').textContent = data.length;
+        document.getElementById('stats').style.display = 'block';
+        document.getElementById('images').textContent = data.filter(a => a.image).length;
+        
+        const loadTime = ((performance.now() - startTime) / 1000).toFixed(2);
+        document.getElementById('fastest').textContent = loadTime;
+        
+        const catalog = document.getElementById('catalog');
+        data.slice(0, 50).forEach((anime, i) => {
+          const card = document.createElement('div');
+          card.className = 'anime-card';
+          card.innerHTML = `
+          <div class="anime-number" style="font-size:30px;font-family:cursive">${i + 1}</div>
+            <img src="${anime.image || 'https://via.placeholder.com/280x400/6c5ce7/ffffff?text=No+Image'}" 
+                 alt="${anime.title}" class="anime-image" loading="lazy" 
+                 onerror="this.src='https://via.placeholder.com/280x400/6c5ce7/ffffff?text=No+Image'">
+            <div class="anime-title">${anime.title || 'Untitled'}</div>
+            
+          `;
+          catalog.appendChild(card);
+        });
+      } catch (e) {
+        document.getElementById('loading').innerHTML = `❌ Error: ${e.message}<br>Check anime.json exists`;
+        document.getElementById('loading').style.color = '#ff6b6b';
+      }
+    }
+    
+    loadCatalog();
+  </script>
+</body>
+</html>
