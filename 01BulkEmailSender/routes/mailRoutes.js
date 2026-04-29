@@ -11,8 +11,8 @@ const upload = multer({ dest: 'uploads/' });
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: 'aryanluvrrim@gmail.com',
-        pass: 'pbajbbpxyjxxltni'
+        user: '',
+        pass: ''
     }
 });
 
@@ -142,8 +142,8 @@ const upload = multer({ dest: 'uploads/' }); // configures multer to store uploa
 const transporter = nodemailer.createTransport({// create transport object which engine that handle connection to our email services and deliever message read in readme more about it
     service: 'gmail',
     auth: {
-        user: 'aryanluvrrim@gmail.com',
-        pass: 'pbajbbpxyjxxltni' // use app password(not your real gmail password it get when you on two factor authentication for your account then genrate passkey)
+        user: '',
+        pass: '' // use app password(not your real gmail password it get when you on two factor authentication for your account then genrate passkey)
     }
 });
 
