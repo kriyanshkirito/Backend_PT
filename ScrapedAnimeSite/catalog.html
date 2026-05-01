@@ -6,10 +6,37 @@
   <title>Top Anime Catalog - MAL Scraper</title>
   <style>
    
-    body { 
-      font-family: system-ui, -apple-system, sans-serif; 
+    
+   [data-theme="light"]{
+    --bg-primary:#ffffff;
+    --bg-secondary:#f0f0f0;
+    --bg-glass:rgba(200,200,200,0.2);
+    --text-primary:#000000;
+    --text-secondary:#333333;
+    --accent-primary:#007bff;
+    --accent-secondary:#ff00aa;
+    --shadow-primary:0 0 10px rgba(0,0,0,0.2);
+
+   }
+
+   [data-theme="night"]{
+    --bg-primary:#000000;
+    --bg-secondary:rgba(50,45,45);
+    --bg-glass:rgba(94,50,50,0.2);
+    --text-primary:rgb(107,118,33);
+    --text-secondary:rgb(160, 167, 115);
+    
+    --accent-primary:rgb(204,187,120);
+    --accent-secondary:rgb(230,161,161);
+    --shadow-primary:0 0 10px rgba(0,0,0,0.2);
+
+   }
+body { 
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-primary);
      
     }
+
     .header { 
       text-align: center; color: white; margin-bottom: 2rem; 
     }
@@ -22,9 +49,11 @@
       gap: 1.5rem; 
     }
     .anime-card { 
-      background: rgba(255,255,255,0.95); 
+      background:var(--bg-secondary); 
+      color:var(--text-secondary);
       border-radius: 1rem; overflow: hidden; 
-      box-shadow: 0 8px 32px rgba(0,0,0,0.2); 
+      box-shadow:var(--shadow-primary); 
+      backdrop-filter:var(--bg-glass);
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       display:flex;
       justify-content:left;
@@ -42,22 +71,44 @@
     }
     .anime-title { 
       padding: 1.5rem; text-align: center; 
-      font-size: 1.2rem; font-weight: 600; color: #2c3e50; 
+      font-size: 1.2rem; font-weight: 600; color:var(--text-secondary); 
       min-height: 4rem; display: flex; align-items: center; justify-content: center; 
     }
     .loading { text-align: center; color: white; font-size: 1.4rem; margin: 4rem 0; }
     .stats { background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; }
     @media (max-width: 640px) { .catalog { grid-template-columns: 1fr; } }
+    #stats{
+      background-color: var(--bg-primary);
+      color:var(--text-primary);
+      
+      display:flex;
+  
+      gap:20px;
+
+    }
+    button{
+      background-color: var(--bg-secondary);
+      color:var(--text-primary);
+      font-family: cursive;
+      border-radius: 5px;;
+
+    }
+   
   </style>
 </head>
-<body>
-  <div class="header">
-    <h1 style="color:Black;font-family:cursive;font-weight:900px">🎌 Top Anime from MAL</h1>
+<body data-theme="night">
+ 
+<div class="header">
+    <h1 style="color:var(--text-primary);font-family:cursive;font-weight:900px">🎌 Top Anime from MAL</h1>
     <p>Your scraper data | <span id="count">0</span> anime loaded</p>
   </div>
   
   <div class="stats" id="stats" style="display:none;">
     Fastest load: <span id="fastest">-</span>s | Images: <span id="images">0</span>
+      
+    <button onclick="setTheme('light')">Light☀️</button>
+    <button onclick="setTheme('night')">Night🌑</button>
+  
   </div>
   
   <div id="loading" class="loading">🔄 Loading your scraped anime...</div>
@@ -101,6 +152,10 @@
     }
     
     loadCatalog();
+
+    function setTheme(theme){
+      document.body.setAttribute("data-theme",theme)
+    }
   </script>
 </body>
 </html>
