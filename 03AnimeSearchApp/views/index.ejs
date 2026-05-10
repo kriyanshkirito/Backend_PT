@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Anime Search</title>
+  <link rel="stylesheet" href="/style.css">
+  
+</head>
+<body>
+
+<!-- Page Title -->
+<h1>Anime Search</h1>
+
+<!-- Search Form -->
+<!-- When user submits, it goes to /search route -->
+<form action="/search" method="GET">
+
+  <!-- Input box for anime name -->
+  <input 
+    type="text" 
+    name="q" 
+    placeholder="Search anime..." 
+    required 
+  />
+
+  <!-- Submit button -->
+  <button type="submit">Search</button>
+</form>
+
+
+<!-- Display Results -->
+<div>
+
+  <!-- Check if animeList exists -->
+  <% if (typeof animeList !== 'undefined') { %>
+
+    <!-- Loop through each anime -->
+    <% animeList.forEach(anime => { %>
+
+      <div>
+        <!-- Anime title -->
+        
+        <a href="/anime/<%= anime.mal_id %>">
+         <h3><%= anime.title %></h3>
+        </a>
+
+        <!-- Anime image -->
+        <img 
+          src="<%= anime.images.jpg.image_url %>" 
+          width="150"
+        />
+
+        <!-- Anime rating -->
+        <p>Rating: <%= anime.score %></p>
+      </div>
+
+    <% }) %>
+
+  <% } %>
+
+</div>
+
+</body>
+</html>
