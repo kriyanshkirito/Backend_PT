@@ -18,7 +18,20 @@ A small Node.js + Puppeteer project that scrapes **MyAnimeList (MAL) Top Anime**
 - `index.html` — Frontend UI to display scraped results
 - `catalog.html` — (Unused/placeholder; UI lives in `index.html`)
 - `package.json` — Dependencies (Puppeteer)
+## ScreenShot
+ ![alt text](<Screenshot 2026-05-11 225804.png>)
+<br>
+<br>
 
+
+ ![alt text](<Screenshot 2026-05-11 225840.png>)
+ <br>
+ <br>
+
+
+ ![alt text](<Screenshot 2026-05-11 225853.png>)
+ <br>
+ <br>
 ## Setup
 1. Install Node.js (LTS recommended)
 2. Install dependencies:
