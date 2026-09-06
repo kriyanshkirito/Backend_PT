@@ -9,10 +9,11 @@ on:
 
 jobs:
   build:
+    name: Build base.apk
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -21,22 +22,38 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build Android APK
-        run: |
-          cd android
-          gradle assembleRelease --stacktrace || gradle assembleDebug --stacktrace
+      - name: Set up Gradle 8.5
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.5'
 
-      - name: Rename and Prepare base.apk
+      - name: Accept Android SDK Licenses
         run: |
-          APK_FILE=$(find . -name "*.apk" | head -n 1)
-          if [ -n "$APK_FILE" ]; then
-            cp "$APK_FILE" ./base.apk
-            echo "Successfully generated base.apk at ./base.apk"
+          yes | sdkmanager --licenses || true
+
+      - name: Build Android APK with Gradle
+        working-directory: 01BulkEmailSender/android
+        run: |
+          gradle assembleDebug --stacktrace --no-daemon
+
+      - name: Prepare and Verify base.apk
+        run: |
+          echo "=== Locating built APK ==="
+          find 01BulkEmailSender/android/app/build/outputs/apk -type f -name "*.apk"
+          APK_PATH=$(find 01BulkEmailSender/android/app/build/outputs/apk -type f -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            APK_PATH=$(find . -type f -name "*.apk" | head -n 1)
+          fi
+          if [ -n "$APK_PATH" ]; then
+            echo "Copying $APK_PATH to ./base.apk"
+            cp "$APK_PATH" ./base.apk
+            ls -la ./base.apk
           else
-            echo "No APK produced" && exit 1
+            echo "ERROR: Build completed but no APK was found!"
+            exit 1
           fi
 
       - name: Upload base.apk Artifact
@@ -44,3 +61,4 @@ jobs:
         with:
           name: base-apk
           path: ./base.apk
+          retention-days: 14
