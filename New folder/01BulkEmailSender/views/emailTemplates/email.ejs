@@ -1,0 +1,19 @@
+<div style="font-family:Arial; max-width:600px; margin:auto; padding:20px;">
+    <h1 style="text-align:center;font-family: cursive;"><%= title %></h1>
+
+    <p>Hello <%= name %>,</p>
+
+    <p><%= message %></p>
+
+    <% if (image) { %>
+      <img src="cid:myimage" style="width:100%; margin-top:10px; border-radius:10px;" />
+    <% } %>
+
+    <% if (buttonText && buttonLink) { %>
+      <a  href="<%= buttonLink %>" 
+         style="display:inline-block; margin-top:15px; padding:10px 15px; background:rgb(0, 200, 255); color:white; text-decoration:none;">
+         <%= buttonText %>
+      </a>
+    <% } %>
+    
+</div>

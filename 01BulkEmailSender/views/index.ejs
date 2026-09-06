@@ -1,32 +1,426 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Email Sender</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bulk Email Sender</title>
     <link rel="stylesheet" href="/style.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#6366f1">
 </head>
 <body>
 
-<h2>Send Bulk Emails</h2>
+<div class="app-container">
 
-<form action="/upload" method="POST" enctype="multipart/form-data">
+    <!-- Top Account Header -->
+    <header class="top-bar">
+        <div class="account-info">
+            <div id="statusDot" class="status-dot"></div>
+            <div class="account-text">
+                <h4>SENDER ACCOUNT</h4>
+                <p id="accountDisplay">Not Connected</p>
+            </div>
+        </div>
+        <button type="button" class="btn-settings" id="btnOpenSettings">⚙️ Account</button>
+    </header>
 
-    <input type="text" name="subject" placeholder="Subject" required><br><br>
+    <!-- Main Campaign Card -->
+    <main class="card">
+        <h2 class="card-title">📧 Bulk Email Dispatcher</h2>
+        <p class="card-subtitle">Personalized bulk campaigns with smart rate-limiting</p>
 
-    <input type="text" name="title" placeholder="Title" required><br><br>
+        <form id="campaignForm">
 
-    <textarea name="message" placeholder="Message" required></textarea><br><br>
+            <!-- 3 Sending Modes Selection -->
+            <label class="mode-label">Select Dispatch Mode</label>
+            <div class="mode-grid">
+                <label class="mode-card active" id="cardSingle">
+                    <input type="radio" name="dispatchMode" value="single" checked>
+                    <div class="mode-icon">⚡</div>
+                    <div class="mode-title">Standard</div>
+                    <div class="mode-desc">1 email/user (Safe delay)</div>
+                </label>
 
-    <input type="text" name="buttonText" placeholder="Button Text"><br><br>
-    <input type="text" name="buttonLink" placeholder="Button Link"><br><br>
+                <label class="mode-card" id="cardRepeat">
+                    <input type="radio" name="dispatchMode" value="repeat">
+                    <div class="mode-icon">🔁</div>
+                    <div class="mode-title">Repeat Burst</div>
+                    <div class="mode-desc">Follow-up rounds (3x)</div>
+                </label>
 
-    <label>Optional Image:</label><br>
-    <input type="file" name="image" accept="image/*"><br><br>
+                <label class="mode-card" id="cardInterval">
+                    <input type="radio" name="dispatchMode" value="interval">
+                    <div class="mode-icon">⏱️</div>
+                    <div class="mode-title">Interval Waves</div>
+                    <div class="mode-desc">Staggered reminder waves</div>
+                </label>
+            </div>
 
-    <label>Upload CSV:</label><br>
-    <input type="file" name="file" required><br><br>
+            <!-- Sub configuration for Repeat Mode -->
+            <div id="repeatConfig" class="sub-config" style="display: none;">
+                <span>Number of Follow-up Rounds:</span>
+                <input type="number" id="repeatCount" name="repeatCount" value="3" min="1" max="5">
+            </div>
 
-    <button type="submit">Send Emails</button>
-</form>
+            <!-- Sub configuration for Interval Mode -->
+            <div id="intervalConfig" class="sub-config" style="display: none;">
+                <span>Minutes between Reminder Waves:</span>
+                <input type="number" id="intervalMinutes" name="intervalMinutes" value="1" min="0.5" step="0.5">
+            </div>
+
+            <!-- Campaign Content Fields -->
+            <div class="form-group">
+                <label for="subject">Email Subject *</label>
+                <input type="text" id="subject" name="subject" class="input-field" placeholder="e.g. Exclusive Update for you!" required>
+            </div>
+
+            <div class="form-group">
+                <label for="title">Template Title *</label>
+                <input type="text" id="title" name="title" class="input-field" placeholder="e.g. Welcome to the Team!" required>
+            </div>
+
+            <div class="form-group">
+                <label for="message">Email Message Body *</label>
+                <textarea id="message" name="message" class="textarea-field" placeholder="Write your personalized message here..." required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="buttonText">Action Button (Optional)</label>
+                <input type="text" id="buttonText" name="buttonText" class="input-field" placeholder="Button text (e.g. View Dashboard)">
+            </div>
+
+            <div class="form-group">
+                <label for="buttonLink">Action Button Link (Optional)</label>
+                <input type="url" id="buttonLink" name="buttonLink" class="input-field" placeholder="https://yourwebsite.com">
+            </div>
+
+            <!-- File Upload Row -->
+            <div class="file-row">
+                <div class="file-box">
+                    <input type="file" id="csvFile" name="file" accept=".csv" required>
+                    <div class="file-box-title">📄 Choose CSV File *</div>
+                    <div id="csvFileName" class="file-box-name">Click to pick .csv</div>
+                </div>
+
+                <div class="file-box">
+                    <input type="file" id="imageFile" name="image" accept="image/*">
+                    <div class="file-box-title">🖼️ Optional Image</div>
+                    <div id="imageFileName" class="file-box-name">Click to attach image</div>
+                </div>
+            </div>
+
+            <!-- Launch Button -->
+            <button type="submit" class="btn-submit" id="btnSubmit">
+                <span>🚀 Launch Email Campaign</span>
+            </button>
+        </form>
+    </main>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 1: One-Time Onboarding & Account Credentials Setup -->
+<!-- ======================================================== -->
+<div class="modal-overlay" id="accountModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>⚙️ Sender Account Setup</h3>
+            <button type="button" class="btn-close" id="btnCloseAccountModal">&times;</button>
+        </div>
+
+        <div class="info-alert">
+            Enter your Gmail credentials <strong>once</strong>. They are stored securely in your app/browser and automatically used for all campaigns.
+        </div>
+
+        <form id="credentialsForm">
+            <div class="form-group">
+                <label for="senderEmailInput">Your Gmail Address *</label>
+                <input type="email" id="senderEmailInput" class="input-field" placeholder="youremail@gmail.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="senderPassInput">16-Character App Password (Passkey) *</label>
+                <div class="password-wrapper">
+                    <input type="password" id="senderPassInput" class="input-field" placeholder="abcd efgh ijkl mnop" required>
+                    <button type="button" class="toggle-pwd" id="btnTogglePwd">Show</button>
+                </div>
+            </div>
+
+            <div id="verifyAlert" style="display: none; padding: 10px; border-radius: 6px; font-size: 0.85rem; margin-bottom: 12px;"></div>
+
+            <button type="submit" class="btn-submit" id="btnSaveCredentials">
+                <span id="saveBtnText">Verify & Save Credentials</span>
+            </button>
+
+            <details class="guide-accordion">
+                <summary>❓ How to get your Google App Password</summary>
+                <ol>
+                    <li>Go to your <strong>Google Account</strong> &gt; <strong>Security</strong>.</li>
+                    <li>Ensure <strong>2-Step Verification</strong> is enabled.</li>
+                    <li>Search for <strong>"App passwords"</strong> in the top search bar.</li>
+                    <li>Create an app named <em>"Bulk Emailer"</em> and copy the generated <strong>16-character code</strong>.</li>
+                </ol>
+            </details>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 2: Progress & Campaign Dispatch Results -->
+<!-- ======================================================== -->
+<div class="modal-overlay" id="progressModal">
+    <div class="modal-content" style="text-align: center;">
+        <div class="modal-header">
+            <h3 id="progressTitle">Sending Campaign...</h3>
+        </div>
+
+        <div id="progressSpinnerContainer" style="margin: 20px 0;">
+            <div class="spinner"></div>
+            <p id="progressSubtitle" style="margin-top: 12px; color: var(--text-muted); font-size: 0.9rem;">
+                Dispatching emails with anti-rate-limit spacing...
+            </p>
+        </div>
+
+        <div id="resultsSummary" style="display: none;">
+            <div style="display: flex; justify-content: space-around; margin: 16px 0;">
+                <div style="color: var(--success);">
+                    <h2 id="summarySent">0</h2>
+                    <small>Sent</small>
+                </div>
+                <div style="color: var(--danger);">
+                    <h2 id="summaryFailed">0</h2>
+                    <small>Failed</small>
+                </div>
+            </div>
+            <div id="logsBox" class="log-box"></div>
+        </div>
+
+        <button type="button" class="btn-submit" id="btnCloseProgressModal" style="display: none; margin-top: 16px;">
+            Done
+        </button>
+    </div>
+</div>
+
+<script>
+    // LocalStorage Keys for One-Time Setup
+    const KEY_EMAIL = 'bulk_sender_email';
+    const KEY_PASS = 'bulk_sender_passkey';
+
+    // Elements
+    const accountModal = document.getElementById('accountModal');
+    const progressModal = document.getElementById('progressModal');
+    const statusDot = document.getElementById('statusDot');
+    const accountDisplay = document.getElementById('accountDisplay');
+    const btnOpenSettings = document.getElementById('btnOpenSettings');
+    const btnCloseAccountModal = document.getElementById('btnCloseAccountModal');
+    const credentialsForm = document.getElementById('credentialsForm');
+    const senderEmailInput = document.getElementById('senderEmailInput');
+    const senderPassInput = document.getElementById('senderPassInput');
+    const btnTogglePwd = document.getElementById('btnTogglePwd');
+    const verifyAlert = document.getElementById('verifyAlert');
+    const btnSaveCredentials = document.getElementById('btnSaveCredentials');
+    const saveBtnText = document.getElementById('saveBtnText');
+
+    const campaignForm = document.getElementById('campaignForm');
+    const btnSubmit = document.getElementById('btnSubmit');
+    const repeatConfig = document.getElementById('repeatConfig');
+    const intervalConfig = document.getElementById('intervalConfig');
+    const csvFile = document.getElementById('csvFile');
+    const imageFile = document.getElementById('imageFile');
+    const csvFileName = document.getElementById('csvFileName');
+    const imageFileName = document.getElementById('imageFileName');
+
+    // Load credentials on startup
+    function loadSavedAccount() {
+        const savedEmail = localStorage.getItem(KEY_EMAIL);
+        const savedPass = localStorage.getItem(KEY_PASS);
+
+        if (savedEmail && savedPass) {
+            statusDot.classList.add('connected');
+            accountDisplay.textContent = savedEmail;
+            senderEmailInput.value = savedEmail;
+            senderPassInput.value = savedPass;
+            return true;
+        } else {
+            statusDot.classList.remove('connected');
+            accountDisplay.textContent = 'Setup Required';
+            // Open modal automatically on first entry
+            setTimeout(() => {
+                accountModal.classList.add('open');
+            }, 300);
+            return false;
+        }
+    }
+
+    // Toggle Password Visibility
+    btnTogglePwd.addEventListener('click', () => {
+        if (senderPassInput.type === 'password') {
+            senderPassInput.type = 'text';
+            btnTogglePwd.textContent = 'Hide';
+        } else {
+            senderPassInput.type = 'password';
+            btnTogglePwd.textContent = 'Show';
+        }
+    });
+
+    // Open/Close Account Modal
+    btnOpenSettings.addEventListener('click', () => {
+        verifyAlert.style.display = 'none';
+        accountModal.classList.add('open');
+    });
+
+    btnCloseAccountModal.addEventListener('click', () => {
+        accountModal.classList.remove('open');
+    });
+
+    // Verify & Save Credentials (One-time Setup)
+    credentialsForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = senderEmailInput.value.trim();
+        const passkey = senderPassInput.value.trim();
+
+        saveBtnText.innerHTML = '<div class="spinner"></div> Verifying...';
+        btnSaveCredentials.disabled = true;
+        verifyAlert.style.display = 'none';
+
+        try {
+            const res = await fetch('/verify-credentials', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, passkey })
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+                // Save permanently in localStorage
+                localStorage.setItem(KEY_EMAIL, email);
+                localStorage.setItem(KEY_PASS, passkey);
+
+                verifyAlert.style.display = 'block';
+                verifyAlert.style.background = 'rgba(16, 185, 129, 0.2)';
+                verifyAlert.style.color = '#10b981';
+                verifyAlert.textContent = '✅ Verified and saved successfully!';
+
+                loadSavedAccount();
+
+                setTimeout(() => {
+                    accountModal.classList.remove('open');
+                    verifyAlert.style.display = 'none';
+                }, 1000);
+            } else {
+                throw new Error(data.error || 'Verification failed.');
+            }
+        } catch (err) {
+            verifyAlert.style.display = 'block';
+            verifyAlert.style.background = 'rgba(239, 68, 68, 0.2)';
+            verifyAlert.style.color = '#ef4444';
+            verifyAlert.textContent = '❌ ' + err.message;
+        } finally {
+            saveBtnText.textContent = 'Verify & Save Credentials';
+            btnSaveCredentials.disabled = false;
+        }
+    });
+
+    // Mode Selector Logic
+    const modeCards = document.querySelectorAll('.mode-card');
+    modeCards.forEach(card => {
+        card.addEventListener('click', () => {
+            modeCards.forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+            const radio = card.querySelector('input[type="radio"]');
+            radio.checked = true;
+
+            const mode = radio.value;
+            repeatConfig.style.display = mode === 'repeat' ? 'flex' : 'none';
+            intervalConfig.style.display = mode === 'interval' ? 'flex' : 'none';
+        });
+    });
+
+    // File name displays
+    csvFile.addEventListener('change', () => {
+        csvFileName.textContent = csvFile.files[0] ? csvFile.files[0].name : 'Click to pick .csv';
+    });
+
+    imageFile.addEventListener('change', () => {
+        imageFileName.textContent = imageFile.files[0] ? imageFile.files[0].name : 'Click to attach image';
+    });
+
+    // Campaign Form Submission via Fetch
+    campaignForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const senderEmail = localStorage.getItem(KEY_EMAIL);
+        const senderPass = localStorage.getItem(KEY_PASS);
+
+        if (!senderEmail || !senderPass) {
+            accountModal.classList.add('open');
+            alert('Please connect your sender Gmail account first!');
+            return;
+        }
+
+        const formData = new FormData(campaignForm);
+        formData.append('senderEmail', senderEmail);
+        formData.append('senderPassword', senderPass);
+
+        const selectedMode = document.querySelector('input[name="dispatchMode"]:checked').value;
+        formData.append('mode', selectedMode);
+
+        // Open progress modal
+        progressModal.classList.add('open');
+        document.getElementById('progressTitle').textContent = 'Sending Campaign...';
+        document.getElementById('progressSpinnerContainer').style.display = 'block';
+        document.getElementById('resultsSummary').style.display = 'none';
+        document.getElementById('btnCloseProgressModal').style.display = 'none';
+        btnSubmit.disabled = true;
+
+        try {
+            const response = await fetch('/upload', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' },
+                body: formData
+            });
+
+            const result = await response.json();
+
+            document.getElementById('progressSpinnerContainer').style.display = 'none';
+            document.getElementById('resultsSummary').style.display = 'block';
+            document.getElementById('btnCloseProgressModal').style.display = 'block';
+
+            if (result.success) {
+                document.getElementById('progressTitle').textContent = '✅ Campaign Dispatched!';
+                document.getElementById('summarySent').textContent = result.sentCount;
+                document.getElementById('summaryFailed').textContent = result.failCount;
+
+                const logsBox = document.getElementById('logsBox');
+                logsBox.innerHTML = '';
+                (result.logs || []).forEach(log => {
+                    const div = document.createElement('div');
+                    div.className = `log-entry ${log.status.includes('Sent') ? 'sent' : 'failed'}`;
+                    div.innerHTML = `<span>${log.email}</span><span>${log.status}</span>`;
+                    logsBox.appendChild(div);
+                });
+            } else {
+                document.getElementById('progressTitle').textContent = '❌ Campaign Failed';
+                document.getElementById('logsBox').innerHTML = `<div style="color:var(--danger); padding:10px;">${result.error}</div>`;
+            }
+        } catch (err) {
+            document.getElementById('progressSpinnerContainer').style.display = 'none';
+            document.getElementById('resultsSummary').style.display = 'block';
+            document.getElementById('btnCloseProgressModal').style.display = 'block';
+            document.getElementById('progressTitle').textContent = '❌ Error';
+            document.getElementById('logsBox').innerHTML = `<div style="color:var(--danger); padding:10px;">${err.message}</div>`;
+        } finally {
+            btnSubmit.disabled = false;
+        }
+    });
+
+    document.getElementById('btnCloseProgressModal').addEventListener('click', () => {
+        progressModal.classList.remove('open');
+    });
+
+    // Run on startup
+    loadSavedAccount();
+</script>
 
 </body>
 </html>

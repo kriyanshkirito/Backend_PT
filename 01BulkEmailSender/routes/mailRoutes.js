@@ -1,370 +1,349 @@
-/*const express = require('express');
+const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const csv = require('csv-parser');
 const fs = require('fs');
+const path = require('path');
 const nodemailer = require('nodemailer');
+const ejs = require('ejs');
+require('dotenv').config();
 
-const upload = multer({ dest: 'uploads/' });
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
-// mail config
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: '',
-        pass: ''
-    }
-});
+const upload = multer({ dest: uploadsDir });
 
-// Verify transporter
-transporter.verify((error, success) => {
-    if (error) {
-        console.log('Transporter verification failed:', error);
-    } else {
-        console.log('Transporter is ready to send emails');
-    }
-});
+// Helper delay to prevent Gmail rate-limit blocks
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// GET page
+// GET / - Render main app dashboard
 router.get('/', (req, res) => {
     res.render('index');
 });
 
-// POST upload
+// POST /verify-credentials - Test user email & app password before saving
+router.post('/verify-credentials', async (req, res) => {
+    try {
+        const { email, passkey } = req.body;
+        const userEmail = (email || '').trim();
+        const userPass = (passkey || '').replace(/\s+/g, '');
+
+        if (!userEmail || !userPass) {
+            return res.status(400).json({
+                success: false,
+                error: 'Both Sender Email and 16-character App Passkey are required.'
+            });
+        }
+
+        const testTransporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: userEmail,
+                pass: userPass
+            }
+        });
+
+        await testTransporter.verify();
+        return res.json({
+            success: true,
+            message: 'Credentials verified! Gmail SMTP is ready.'
+        });
+    } catch (err) {
+        console.error('Credential verification error:', err.message);
+        return res.status(400).json({
+            success: false,
+            error: err.message || 'Failed to authenticate with Gmail. Please check your App Password.'
+        });
+    }
+});
+
+// POST /upload - Execute bulk email campaign
 router.post('/upload',
     upload.fields([
         { name: 'file', maxCount: 1 },
         { name: 'image', maxCount: 1 }
     ]),
-async (req, res) => {
+    async (req, res) => {
+        try {
+            const {
+                subject = 'Notification',
+                title = 'Announcement',
+                message = '',
+                buttonText = '',
+                buttonLink = '',
+                mode = 'single',            // 'single' | 'repeat' | 'interval'
+                repeatCount = 3,            // for repeat mode
+                intervalMinutes = 1,        // for interval mode
+                senderEmail,
+                senderPassword
+            } = req.body;
 
-    const { subject, title, message, buttonText, buttonLink } = req.body;
+            // Prioritize user-provided credentials from UI, fallback to .env
+            const userEmail = (senderEmail || process.env.USER || '').trim();
+            const userPass = (senderPassword || process.env.PASS || '').replace(/\s+/g, '');
 
-    const csvFile = req.files['file'][0];
-    const imageFile = req.files['image'] ? req.files['image'][0] : null;
-
-    const results = [];
-
-    fs.createReadStream(csvFile.path)
-        .pipe(csv())
-        .on('data', (data) => results.push(data))
-        .on('error', (err) => {
-            console.error('Error parsing CSV:', err);
-            res.status(500).send('Error parsing CSV file');
-        })
-        .on('end', async () => {
-            console.log('Parsed CSV data:', results);
-
-            const delay = ms => new Promise(r => setTimeout(r, ms));
-
-            let sentCount = 0;
-            let failCount = 0;
-
-            for (let user of results) {
-                if (!user.email) {
-                    console.log('Skipping user without email:', user);
-                    failCount++;
-                    continue;
-                }
-
-                const html = `
-                <div style="font-family:Arial; max-width:600px; margin:auto; padding:20px;">
-                    
-                    <h1 style="align-text:center">${title}</hi>
-
-                    <p>Hello ${user.name || "User"},</p>
-
-                    <p>${message}</p>
-
-                    ${
-                        imageFile
-                        ? `<img src="cid:myimage" style="width:100%; margin-top:10px; border-radius:10px;" />`
-                        : ""
-                    }
-
-                    ${
-                        buttonText && buttonLink
-                        ? `<a href="${buttonLink}" 
-                             style="display:inline-block; margin-top:15px; padding:10px 15px; background:blue; color:white; text-decoration:none;">
-                             ${buttonText}
-                           </a>`
-                        : ""
-                    }
-
-                </div>
-                `;
-
-                try {
-                    await transporter.sendMail({
-                        from: 'aryanluvrrim@gmail.com',
-                        to: user.email,
-                        subject: subject,
-                        html: html,
-                        attachments: imageFile ? [{
-                            filename: imageFile.originalname,
-                            path: imageFile.path,
-                            cid: 'myimage'
-                        }] : []
-                    });
-
-                    console.log("Sent:", user.email);
-                    sentCount++;
-                    await delay(2000);
-
-                } catch (err) {
-                    console.log("Fail:", user.email, err.message);
-                    failCount++;
-                }
+            if (!userEmail || !userPass) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Sender email and passkey are required. Please configure your credentials.'
+                });
             }
 
-            res.send(`Emails sent: ${sentCount} successful, ${failCount} failed.`);
-        });
-});
-
-module.exports = router;
-this is when we not introduce email.ejs
-
-*/
-//after email.ejs
-/* send one time only
-const express = require('express'); // loads express web framework
-const router = express.Router();// create router object to define routes separetly for app.js
-const multer = require('multer'); // multer handles files upload(csv and image)
-const csv = require('csv-parser');  // reads csv file line by line
-const fs = require('fs'); // node file system module (aloow to create ,read,write  and delete files from directory  provide asynchronus blocking and syncrhronus method for operation like reading,config files,saving user uploaded files ) we used to read csv
-const nodemailer = require('nodemailer');// nodemailer is polar secure and zero dependecy library for node.js that enable easy mailing sending from server,it supporrts smtp ,html content,attachemnt and etc (we use becuse it send emails via SMTP)
-const ejs = require('ejs'); // render HTML conetent with dynamic data(ejs is module in whcih we can use javascript nicely we have to not work hard to find id of element then change the thing we want ejs directly do)
-const path = require('path'); // path module is use to handle and tranform directory path
-
-const upload = multer({ dest: 'uploads/' }); // configures multer to store uploaded files in the folder uploads
-
-// mail config
-const transporter = nodemailer.createTransport({// create transport object which engine that handle connection to our email services and deliever message read in readme more about it
-    service: 'gmail',
-    auth: {
-        user: '',
-        pass: '' // use app password(not your real gmail password it get when you on two factor authentication for your account then genrate passkey)
-    }
-});
-
-// Verify transporter
-transporter.verify((error, success) => { // check if tranporter connect to gmail properly
-    if (error) {
-        console.log('Transporter verification failed:', error);
-    } else {
-        console.log('Transporter is ready to send emails');
-    }
-});
-
-// GET page
-router.get('/', (req, res) => { // define get routes at "/" renders index page our uploaded form
-    res.render('index');
-});
-
-// POST upload
-router.post('/upload',   // define Post Route At /upload
-    upload.fields([ // accecpt two uploaded file
-        { name: 'file', maxCount: 1 },  // csv file (csv file should ve in the note form as we genrated that when you open csv file in notes then it contain gmail,name then save and in type enter for all files)
-        { name: 'image', maxCount: 1 } // optinal image upload 
-    ]),
-async (req, res) => { // we are using async so that wait until this finish
-
-    const { subject, title, message, buttonText, buttonLink } = req.body;
-
-    const csvFile = req.files['file'][0];  // get csv files
-    const imageFile = req.files['image'] ? req.files['image'][0] : null; // get image files if provided (means image upload is optional) ,this code tells if image found then image files else return null
-
-    const results = []; // define array name result
-
-    fs.createReadStream(csvFile.path) // this read csv file line by line
-        .pipe(csv())  // send file data to csv parser
-        .on('data', (data) => results.push(data)) // runs each row after parsing then store in result array the data(gmail and name) then if there are two gmail in csv then array contain two element
-        .on('error', (err) => {  // after parsing check error
-            console.error('Error parsing CSV:', err);
-            res.status(500).send('Error parsing CSV file');
-        })
-        .on('end', async () => {
-            console.log('Parsed CSV data:', results);  //  Runs when entire file is finished reading Now `results` has **all rows**
-
-
-            const delay = ms => new Promise(r => setTimeout(r, ms));  // define helfer function to pause between email to avoid gmail limit
-
-            let sentCount = 0; // counts for sucessful and fail sends
-            let failCount = 0;
-
-            for (let user of results) { // look each row of csv we store in array results
-                if (!user.email) {
-                    console.log('Skipping user without email:', user); // skipping user without gmail
-                    failCount++; 
-                    continue;
-                }
-
-                // Render EJS template
-                const html = await ejs.renderFile( // load and render email.ejs
-                    path.join(__dirname, '../views/emailTemplates/email.ejs'), // inject dynamic values(ex titles,name,message,etc)
-                    {
-                        title, //this is in form 
-                        name: user.name || "User", // name which is presnt in csv file if anme not found then use user
-                        message,  // this in form that we want to send in gmail
-                        image: !!imageFile, // return true if image uploaded 
-                        buttonText, // this is button text present in our form what to write in button
-                        buttonLink
-                    }
-                );
-
-                try {
-                    await transporter.sendMail({ // uses nodemailer and said wait until email is sent before moving on
-                        from: 'aryanluvrrim@gmail.com',
-                        to: user.email, // get email from csv
-                        subject: subject,
-                        html: html,
-                        attachments: imageFile ? [{
-                            filename: imageFile.originalname,
-                            path: imageFile.path,
-                            cid: 'myimage'
-                        }] : []
-                    });
-
-                    console.log("Sent:", user.email);
-                    sentCount++;
-                    await delay(2000); // wait 2 secnodn to prevent gmail blocking rate
-
-                } catch (err) {
-                    console.log("Fail:", user.email, err.message);  // runs if sending fails 
-                    failCount++;
-                }
+            if (!req.files || !req.files['file'] || req.files['file'].length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Please upload a valid CSV file containing recipient emails.'
+                });
             }
 
-            res.send(`Emails sent: ${sentCount} successful, ${failCount} failed.`);
-        });
-});
+            const csvFile = req.files['file'][0];
+            const imageFile = req.files['image'] ? req.files['image'][0] : null;
 
-module.exports = router;
-
-*/
-
-
-// email sent 3 times repaeatedly 
-require('dotenv').config();
-const express = require('express'); // loads express web framework
-const router = express.Router();// create router object to define routes separetly for app.js
-const multer = require('multer'); // multer handles files upload(csv and image)
-
-const csv = require('csv-parser');  // reads csv file line by line
-const fs = require('fs'); // node file system module (aloow to create ,read,write  and delete files from directory  provide asynchronus blocking and syncrhronus method for operation like reading,config files,saving user uploaded files ) we used to read csv
-const nodemailer = require('nodemailer');// nodemailer is polar secure and zero dependecy library for node.js that enable easy mailing sending from server,it supporrts smtp ,html content,attachemnt and etc (we use becuse it send emails via SMTP)
-const ejs = require('ejs'); // render HTML conetent with dynamic data(ejs is module in whcih we can use javascript nicely we have to not work hard to find id of element then change the thing we want ejs directly do)
-const path = require('path'); // path module is use to handle and tranform directory path
-require('dotenv').config();
-
-const username=process.env.USER;
-const passkey=process.env.PASS;
-const upload = multer({ dest: 'uploads/' }); // configures multer to store uploaded files in the folder uploads
-
-// mail config
-const transporter = nodemailer.createTransport({// create transport object which engine that handle connection to our email services and deliever message read in readme more about it
-    service: 'gmail',
-    auth: {
-        user: username,
-        pass: passkey // use app password(not your real gmail password it get when you on two factor authentication for your account then genrate passkey)
-    }
-});
-
-// Verify transporter
-transporter.verify((error, success) => { // check if tranporter connect to gmail properly
-    if (error) {
-        console.log('Transporter verification failed:', error);
-    } else {
-        console.log('Transporter is ready to send emails');
-    }
-});
-
-// GET page
-router.get('/', (req, res) => { // define get routes at "/" renders index page our uploaded form
-    res.render('index');
-});
-
-// POST upload
-router.post('/upload',   // define Post Route At /upload
-    upload.fields([ // accecpt two uploaded file
-        { name: 'file', maxCount: 1 },  // csv file (csv file should ve in the note form as we genrated that when you open csv file in notes then it contain gmail,name then save and in type enter for all files)
-        { name: 'image', maxCount: 1 } // optinal image upload 
-    ]),
-async (req, res) => { // we are using async so that wait until this finish
-
-    const { subject, title, message, buttonText, buttonLink } = req.body;
-
-    const csvFile = req.files['file'][0];  // get csv files
-    const imageFile = req.files['image'] ? req.files['image'][0] : null; // get image files if provided (means image upload is optional) ,this code tells if image found then image files else return null
-
-    const results = []; // define array name result
-
-    fs.createReadStream(csvFile.path) // this read csv file line by line
-        .pipe(csv())  // send file data to csv parser
-        .on('data', (data) => results.push(data)) // runs each row after parsing then store in result array the data(gmail and name) then if there are two gmail in csv then array contain two element
-        .on('error', (err) => {  // after parsing check error
-            console.error('Error parsing CSV:', err);
-            res.status(500).send('Error parsing CSV file');
-        })
-        .on('end', async () => {
-            console.log('Parsed CSV data:', results);  //  Runs when entire file is finished reading Now `results` has **all rows**
-
-
-            const delay = ms => new Promise(r => setTimeout(r, ms));  // define helfer function to pause between email to avoid gmail limit
-
-            let sentCount = 0; // counts for sucessful and fail sends
-            let failCount = 0;
-
-            for (let user of results) { // look each row of csv we store in array results
-                if (!user.email) {
-                    console.log('Skipping user without email:', user); // skipping user without gmail
-                    failCount++; 
-                    continue;
+            // Create transporter with the user's credentials
+            const transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth: {
+                    user: userEmail,
+                    pass: userPass
                 }
+            });
 
-                // Render EJS template
-                const html = await ejs.renderFile( // load and render email.ejs
-                    path.join(__dirname, '../views/emailTemplates/email.ejs'), // inject dynamic values(ex titles,name,message,etc)
-                    {
-                        title, //this is in form 
-                        name: user.name || "User", // name which is presnt in csv file if anme not found then use user
-                        message,  // this in form that we want to send in gmail
-                        image: !!imageFile, // return true if image uploaded 
-                        buttonText, // this is button text present in our form what to write in button
-                        buttonLink
+            // Parse CSV
+            const results = [];
+            fs.createReadStream(csvFile.path)
+                .pipe(csv())
+                .on('data', (data) => {
+                    // Normalize keys to lowercase to avoid 'Email' vs 'email' mismatches
+                    const normalized = {};
+                    for (const key of Object.keys(data)) {
+                        normalized[key.trim().toLowerCase()] = data[key] ? data[key].trim() : '';
                     }
-                );
-                 for(let i=1;i<=3;i++){
-                try {
-                    await transporter.sendMail({ // uses nodemailer and said wait until email is sent before moving on
-                        from: 'aryanluvrrim@gmail.com',
-                        to: user.email, // get email from csv
-                        subject: subject,
-                        html: html,
-                        attachments: imageFile ? [{
-                            filename: imageFile.originalname,
-                            path: imageFile.path,
-                            cid: 'myimage'
-                        }] : []
-                    });
+                    if (normalized.email) {
+                        results.push(normalized);
+                    }
+                })
+                .on('error', (err) => {
+                    console.error('Error parsing CSV:', err);
+                    if (fs.existsSync(csvFile.path)) fs.unlinkSync(csvFile.path);
+                    if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+                    return res.status(500).json({ success: false, error: 'Error parsing CSV file.' });
+                })
+                .on('end', async () => {
+                    console.log(`Parsed ${results.length} valid recipients from CSV.`);
 
-                    console.log("Sent:", user.email);
-                    sentCount++;
-                    await delay(2000); // wait 2 secnodn to prevent gmail blocking rate
+                    if (results.length === 0) {
+                        if (fs.existsSync(csvFile.path)) fs.unlinkSync(csvFile.path);
+                        if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+                        return res.status(400).json({
+                            success: false,
+                            error: 'No valid recipient rows found in CSV. Please ensure the header includes "email".'
+                        });
+                    }
 
-                } catch (err) {
-                    console.log("Fail:", user.email, err.message);  // runs if sending fails 
-                    failCount++;
-                }
-            }
+                    let sentCount = 0;
+                    let failCount = 0;
+                    const logs = [];
+
+                    const templatePath = path.join(__dirname, '../views/emailTemplates/email.ejs');
+
+                    // ==========================================
+                    // MODE 1: Standard Bulk Send (Single)
+                    // ==========================================
+                    if (mode === 'single') {
+                        for (const user of results) {
+                            try {
+                                const html = await ejs.renderFile(templatePath, {
+                                    title,
+                                    name: user.name || 'User',
+                                    message,
+                                    image: !!imageFile,
+                                    buttonText,
+                                    buttonLink
+                                });
+
+                                await transporter.sendMail({
+                                    from: userEmail,
+                                    to: user.email,
+                                    subject: subject,
+                                    html: html,
+                                    attachments: imageFile ? [{
+                                        filename: imageFile.originalname,
+                                        path: imageFile.path,
+                                        cid: 'myimage'
+                                    }] : []
+                                });
+
+                                sentCount++;
+                                logs.push({ email: user.email, status: 'Sent' });
+                                console.log(`[Single Mode] Sent to: ${user.email}`);
+                                await delay(2000); // 2-second rate limit
+                            } catch (err) {
+                                failCount++;
+                                logs.push({ email: user.email, status: 'Failed', error: err.message });
+                                console.error(`[Single Mode] Failed for: ${user.email} - ${err.message}`);
+                            }
+                        }
+                    }
+
+                    // ==========================================
+                    // MODE 2: Repeat Burst Send (Sequential)
+                    // ==========================================
+                    else if (mode === 'repeat') {
+                        const totalRounds = Math.min(Math.max(parseInt(repeatCount) || 3, 1), 5); // between 1 and 5
+                        for (const user of results) {
+                            for (let round = 1; round <= totalRounds; round++) {
+                                try {
+                                    const roundSubject = `${subject}${totalRounds > 1 ? ` (Follow-up #${round})` : ''}`;
+                                    const html = await ejs.renderFile(templatePath, {
+                                        title,
+                                        name: user.name || 'User',
+                                        message,
+                                        image: !!imageFile,
+                                        buttonText,
+                                        buttonLink
+                                    });
+
+                                    await transporter.sendMail({
+                                        from: userEmail,
+                                        to: user.email,
+                                        subject: roundSubject,
+                                        html: html,
+                                        attachments: imageFile ? [{
+                                            filename: imageFile.originalname,
+                                            path: imageFile.path,
+                                            cid: 'myimage'
+                                        }] : []
+                                    });
+
+                                    sentCount++;
+                                    logs.push({ email: user.email, status: `Sent (Round ${round}/${totalRounds})` });
+                                    console.log(`[Repeat Mode] Sent Round ${round} to: ${user.email}`);
+                                    await delay(2000);
+                                } catch (err) {
+                                    failCount++;
+                                    logs.push({ email: user.email, status: `Failed (Round ${round})`, error: err.message });
+                                    console.error(`[Repeat Mode] Failed Round ${round} for: ${user.email} - ${err.message}`);
+                                }
+                            }
+                        }
+                    }
+
+                    // ==========================================
+                    // MODE 3: Interval / Staggered Waves
+                    // ==========================================
+                    else if (mode === 'interval') {
+                        const intervalMin = Math.max(parseFloat(intervalMinutes) || 1, 0.5);
+
+                        // Send Wave 1 immediately for all recipients
+                        for (const user of results) {
+                            try {
+                                const html = await ejs.renderFile(templatePath, {
+                                    title,
+                                    name: user.name || 'User',
+                                    message,
+                                    image: !!imageFile,
+                                    buttonText,
+                                    buttonLink
+                                });
+
+                                await transporter.sendMail({
+                                    from: userEmail,
+                                    to: user.email,
+                                    subject: `${subject} (Initial Notice)`,
+                                    html: html,
+                                    attachments: imageFile ? [{
+                                        filename: imageFile.originalname,
+                                        path: imageFile.path,
+                                        cid: 'myimage'
+                                    }] : []
+                                });
+
+                                sentCount++;
+                                logs.push({ email: user.email, status: 'Sent (Wave 1 Initial)' });
+                                console.log(`[Interval Mode] Sent Wave 1 to: ${user.email}`);
+                                await delay(2000);
+                            } catch (err) {
+                                failCount++;
+                                logs.push({ email: user.email, status: 'Failed (Wave 1)', error: err.message });
+                            }
+                        }
+
+                        // Schedule Wave 2 and Wave 3 in background with user-configured intervals
+                        const scheduleWave = (waveNum, delayMinutes) => {
+                            setTimeout(async () => {
+                                console.log(`Starting scheduled Wave ${waveNum} after ${delayMinutes} min...`);
+                                for (const user of results) {
+                                    try {
+                                        const html = await ejs.renderFile(templatePath, {
+                                            title,
+                                            name: user.name || 'User',
+                                            message,
+                                            image: !!imageFile,
+                                            buttonText,
+                                            buttonLink
+                                        });
+
+                                        await transporter.sendMail({
+                                            from: userEmail,
+                                            to: user.email,
+                                            subject: `${subject} (Reminder Wave #${waveNum})`,
+                                            html: html,
+                                            attachments: imageFile ? [{
+                                                filename: imageFile.originalname,
+                                                path: imageFile.path,
+                                                cid: 'myimage'
+                                            }] : []
+                                        });
+                                        console.log(`[Interval Mode - Wave ${waveNum}] Sent to: ${user.email}`);
+                                        await delay(2000);
+                                    } catch (err) {
+                                        console.error(`[Interval Mode - Wave ${waveNum}] Error for ${user.email}:`, err.message);
+                                    }
+                                }
+                            }, delayMinutes * 60 * 1000);
+                        };
+
+                        scheduleWave(2, intervalMin);
+                        scheduleWave(3, intervalMin * 2);
+                    }
+
+                    // Clean up CSV file after dispatch
+                    if (fs.existsSync(csvFile.path)) {
+                        fs.unlinkSync(csvFile.path);
+                    }
+
+                    // Respond to client
+                    if (req.xhr || req.headers.accept?.includes('application/json')) {
+                        return res.json({
+                            success: true,
+                            mode,
+                            totalRecipients: results.length,
+                            sentCount,
+                            failCount,
+                            logs: logs.slice(0, 50),
+                            message: mode === 'interval'
+                                ? `Wave 1 dispatched! (${sentCount} sent). Waves 2 & 3 scheduled every ${intervalMinutes} min.`
+                                : `Campaign complete! ${sentCount} sent successfully, ${failCount} failed.`
+                        });
+                    } else {
+                        return res.send(`
+                            <div style="font-family: sans-serif; text-align: center; padding: 40px;">
+                                <h2>Campaign Results (${mode.toUpperCase()} Mode)</h2>
+                                <p><strong>Sent:</strong> ${sentCount}</p>
+                                <p><strong>Failed:</strong> ${failCount}</p>
+                                <a href="/" style="display:inline-block; margin-top:20px; padding:10px 20px; background:#007bff; color:white; text-decoration:none; border-radius:5px;">Back to App</a>
+                            </div>
+                        `);
+                    }
+                });
+        } catch (error) {
+            console.error('Upload handler fatal error:', error);
+            return res.status(500).json({ success: false, error: error.message || 'Internal server error.' });
         }
-
-            res.send(`Emails sent: ${sentCount} successful, ${failCount} failed.`);
-        });
-});
+    }
+);
 
 module.exports = router;
-
-
-
-

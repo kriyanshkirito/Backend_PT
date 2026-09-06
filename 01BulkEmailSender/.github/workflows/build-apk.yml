@@ -1,0 +1,46 @@
+name: Build Android APK (base.apk)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build Android APK
+        run: |
+          cd android
+          gradle assembleRelease --stacktrace || gradle assembleDebug --stacktrace
+
+      - name: Rename and Prepare base.apk
+        run: |
+          APK_FILE=$(find . -name "*.apk" | head -n 1)
+          if [ -n "$APK_FILE" ]; then
+            cp "$APK_FILE" ./base.apk
+            echo "Successfully generated base.apk at ./base.apk"
+          else
+            echo "No APK produced" && exit 1
+          fi
+
+      - name: Upload base.apk Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: base-apk
+          path: ./base.apk
